@@ -60,6 +60,8 @@ export default function HeroSequence({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<(HTMLImageElement | null)[]>([]);
   const preloadedRef = useRef<boolean>(false);
+  const frameRef = useRef(1); // latest frame, read by the resize handler
+  const drawFrameRef = useRef<(frameIndex: number) => void>(() => {});
   const preloadThreshold = Math.ceil(TOTAL_FRAMES * 0.45); // start once ~45% is buffered
 
   const [activeFrame, setActiveFrame] = useState(1);
@@ -113,7 +115,8 @@ export default function HeroSequence({
     loadAllFrames();
   }, [onProgress, onPreloadComplete, preloadThreshold]);
 
-  // Canvas drawing — raw frame + a subtle in-canvas grade for cinematic punch.
+  // Canvas setup + resize — runs ONCE. Resizing reallocates the canvas, so we
+  // only do it on real window/orientation changes, never per scroll frame.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -162,21 +165,30 @@ export default function HeroSequence({
       }
       if (img) drawImageCover(img);
     };
+    drawFrameRef.current = drawFrame;
 
     const handleResize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // 1x density on phones halves the pixels the GPU pushes each frame — the
+      // single biggest mobile win. Desktop keeps crisp 2x.
+      const isMobile = window.innerWidth < 768;
+      const dpr = isMobile ? 1 : Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
       canvas.style.width = `${window.innerWidth}px`;
       canvas.style.height = `${window.innerHeight}px`;
-      drawFrame(activeFrame);
+      drawFrame(frameRef.current);
     };
 
     window.addEventListener("resize", handleResize);
     handleResize();
-    drawFrame(activeFrame);
 
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Per-frame draw — cheap: just paints the current frame, no reallocation.
+  useEffect(() => {
+    frameRef.current = activeFrame;
+    drawFrameRef.current(activeFrame);
   }, [activeFrame, loadedCount]);
 
   // ScrollTrigger — Lenis provides the smoothing, so we scrub directly (no extra lag).
