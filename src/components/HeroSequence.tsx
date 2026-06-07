@@ -9,6 +9,8 @@ if (typeof window !== "undefined") {
 }
 
 const TOTAL_FRAMES = 138;
+// Prefixes public asset paths on GitHub Pages (e.g. /Gujju_Food). Empty in dev.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 // Story beats as [scrollProgress, frameIndex] anchors. Repeated frames create
 // eased "holds" so each location gets a still cinematic moment for the typography.
@@ -71,7 +73,7 @@ export default function HeroSequence({
       }
       const img = new Image();
       const frameNum = String(index).padStart(4, "0");
-      img.src = `/frames/frame_${frameNum}.webp`;
+      img.src = `${BASE_PATH}/frames/frame_${frameNum}.webp`;
       img.onload = () => {
         imagesRef.current[index - 1] = img;
         setLoadedCount((prev) => prev + 1);
