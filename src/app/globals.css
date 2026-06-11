@@ -486,3 +486,354 @@ button {
     max-width: 320px;
   }
 }
+
+/* ==========================================================================
+   SECTION 02 — SIGNATURE FAVOURITES (pinned product showcase)
+   Self-contained namespace (.ps-*). Does not touch any Hero rules.
+   ========================================================================== */
+.ps-section {
+  /* Section-local palette (kept consistent across products; only --glow changes) */
+  --ps-bg: #fff8f0; /* Floral White */
+  --ps-teal: #2ba7a0;
+  --ps-gold: #f4d06f;
+  --ps-orange: #ff8811;
+  --ps-indigo: #392f5a;
+  --ps-text: #2d2d2d;
+  position: relative;
+  width: 100%;
+}
+
+.ps-stage {
+  position: relative;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: radial-gradient(125% 90% at 50% 42%, #fffdfa 0%, var(--ps-bg) 58%, #f5ebde 100%);
+  color: var(--ps-text);
+  font-family: var(--font-gotib), var(--font-sans);
+}
+
+/* Each product occupies the full stage; opacity/transform cross-fades between them */
+.ps-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(340px, 1.3fr) minmax(200px, 1fr);
+  align-items: center;
+  gap: clamp(20px, 4vw, 72px);
+  padding: clamp(80px, 9vh, 130px) clamp(28px, 6vw, 110px);
+  will-change: opacity;
+}
+
+.ps-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- LEFT: price · name · badge ---- */
+.ps-left {
+  align-items: flex-start;
+  gap: 20px;
+  z-index: 5;
+}
+
+.ps-price {
+  font-family: var(--font-after), var(--font-serif);
+  font-size: clamp(2rem, 3.4vw, 3.1rem);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--accent, var(--ps-orange));
+  will-change: transform, opacity;
+}
+
+.ps-name {
+  font-family: var(--font-after), var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 4vw, 4.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--ps-indigo);
+  overflow: hidden; /* lets characters rise from a clean baseline */
+  padding-bottom: 0.12em;
+}
+
+/* Keep each word intact — names break between words, never mid-word */
+.ps-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.ps-char {
+  display: inline-block;
+  white-space: pre;
+  will-change: transform, opacity;
+}
+
+.ps-badge {
+  font-family: var(--font-gotib), var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ps-teal);
+  padding: 8px 16px;
+  border: 1px solid rgba(43, 167, 160, 0.35);
+  border-radius: 100px;
+  background: rgba(43, 167, 160, 0.07);
+  will-change: transform, opacity;
+}
+
+/* ---- CENTER: hero product image with glow + floating ingredients ---- */
+.ps-center {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ps-glow {
+  position: absolute;
+  width: min(62vh, 540px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 46%, var(--glow), rgba(0, 0, 0, 0) 68%);
+  filter: blur(10px);
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ps-image-wrap {
+  position: relative;
+  z-index: 3;
+  width: min(48vh, 440px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform, filter;
+}
+
+.ps-image-float {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+.ps-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 30px 42px rgba(57, 47, 90, 0.28));
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.ps-image.is-loaded {
+  opacity: 1;
+}
+
+/* Graceful stand-in until a real transparent PNG is dropped into /assets/Product */
+.ps-monogram {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-after), var(--font-serif);
+  font-size: clamp(3.2rem, 11vh, 7rem);
+  letter-spacing: 0.04em;
+  color: rgba(57, 47, 90, 0.16);
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ps-floats {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.ps-chip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+}
+
+.ps-chip-inner {
+  display: inline-block;
+  font-family: var(--font-gotib), var(--font-sans);
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  padding: 7px 14px;
+  border-radius: 100px;
+  white-space: nowrap;
+  color: var(--ps-indigo);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 6px 22px rgba(57, 47, 90, 0.12);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  will-change: transform;
+}
+
+/* ---- RIGHT: story · description · ingredients ---- */
+.ps-right {
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 30rem;
+  z-index: 5;
+}
+
+.ps-story {
+  font-family: var(--font-after), var(--font-serif);
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  line-height: 1.32;
+  color: var(--ps-indigo);
+  will-change: transform, opacity;
+}
+
+.ps-desc {
+  font-family: var(--font-gotib), var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: rgba(45, 45, 45, 0.82);
+  will-change: transform, opacity;
+}
+
+.ps-ingredients {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.ps-ingredients li {
+  font-family: var(--font-gotib), var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--ps-teal);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(43, 167, 160, 0.08);
+  will-change: transform, opacity;
+}
+
+/* ---- Organic SVG waves, top & bottom ---- */
+.ps-wave {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: clamp(80px, 14vh, 150px);
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.ps-wave.top {
+  top: -1px;
+}
+
+.ps-wave.bottom {
+  bottom: -1px;
+  transform: scaleY(-1);
+}
+
+.ps-wave-inner {
+  position: absolute;
+  inset: 0;
+  width: 130%;
+  left: -15%;
+  will-change: transform;
+}
+
+.ps-wave-inner svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Section chrome: eyebrow + product counter ---- */
+.ps-eyebrow {
+  position: absolute;
+  top: clamp(24px, 4.5vh, 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  font-family: var(--font-gotib), var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ps-teal);
+  white-space: nowrap;
+}
+
+.ps-counter {
+  position: absolute;
+  bottom: clamp(22px, 4.5vh, 46px);
+  right: clamp(24px, 5vw, 64px);
+  z-index: 6;
+  font-family: var(--font-after), var(--font-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  color: rgba(57, 47, 90, 0.55);
+}
+
+/* ---- Responsive: stack to a single column on tablet / mobile ---- */
+@media (max-width: 980px) {
+  .ps-slide {
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    justify-items: center;
+    text-align: center;
+    align-content: center;
+    gap: clamp(14px, 3vh, 26px);
+    padding: clamp(74px, 11vh, 96px) 24px clamp(54px, 9vh, 76px);
+  }
+  .ps-left {
+    align-items: center;
+    order: 1;
+    gap: 12px;
+  }
+  .ps-center {
+    order: 2;
+    height: auto;
+  }
+  .ps-right {
+    order: 3;
+    align-items: center;
+    max-width: 34rem;
+  }
+  .ps-name {
+    font-size: clamp(2.4rem, 9vw, 3.6rem);
+  }
+  .ps-glow {
+    width: min(40vh, 320px);
+  }
+  .ps-image-wrap {
+    width: min(34vh, 260px);
+  }
+  .ps-floats {
+    display: none; /* lighter + cleaner on small screens */
+  }
+  .ps-ingredients {
+    justify-content: center;
+  }
+  .ps-eyebrow {
+    font-size: 0.64rem;
+    letter-spacing: 0.3em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-image {
+    transition: none;
+  }
+}

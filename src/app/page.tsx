@@ -5,6 +5,7 @@ import Preloader from "@/components/Preloader";
 import SmoothScroll from "@/components/SmoothScroll";
 import HeroSequence from "@/components/HeroSequence";
 import TextOverlay from "@/components/TextOverlay";
+import ProductShowcase from "@/components/ProductShowcase";
 
 export default function Home() {
   const [preloadProgress, setPreloadProgress] = useState(0);
@@ -45,6 +46,9 @@ export default function Home() {
         />
         <TextOverlay progress={scrollProgress} />
       </main>
+
+      {/* 3. SIGNATURE FAVOURITES — pinned product showcase (Section 02) */}
+      <ProductShowcase />
     </SmoothScroll>
   );
 }
