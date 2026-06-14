@@ -27,17 +27,17 @@ interface Product {
 // Order follows the approved scroll flow: 0-20% … 80-100%.
 const PRODUCTS: Product[] = [
   {
-    id: "royal-faluda",
-    name: "Royal Faluda",
-    price: "$8.90",
+    id: "pav-bhaji",
+    name: "Pav Bhaji",
+    price: "$7.50",
     badge: "Customer Favourite",
-    story: "A regal Mughlai indulgence, poured cold and crowned with kulfi.",
+    story: "A beloved Mumbai street food, bursting with flavour and served with buttery pav.",
     description:
-      "Chilled rose-kissed milk layered over silky vermicelli and basil seeds, finished with a slow-set saffron kulfi.",
-    ingredients: ["Rose Petals", "Pistachios", "Almonds", "Basil Seeds", "Kulfi Ice Cream"],
+      "A rich vegetable mash simmered in a spiced tomato gravy, served piping hot with toasted butter pav and a squeeze of lemon.",
+    ingredients: ["Butter Pav", "Tomato Gravy", "Mixed Vegetables", "Lemon", "Coriander"],
     glow: "rgba(232, 93, 134, 0.55)",
     accent: "#E85D86",
-    image: "royal-faluda.png",
+    image: "pav-bhaji.png",
   },
   {
     id: "vada-pav",
