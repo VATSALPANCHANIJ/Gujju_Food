@@ -6,6 +6,7 @@ import SmoothScroll from "@/components/SmoothScroll";
 import HeroSequence from "@/components/HeroSequence";
 import TextOverlay from "@/components/TextOverlay";
 import ProductShowcase from "@/components/ProductShowcase";
+import BookingSection from "@/components/Booking/BookingSection";
 
 export default function Home() {
   const [preloadProgress, setPreloadProgress] = useState(0);
@@ -49,6 +50,9 @@ export default function Home() {
 
       {/* 3. SIGNATURE FAVOURITES — pinned product showcase (Section 02) */}
       <ProductShowcase />
+
+      {/* 4. TABLE BOOKING — self-contained, portable (temporary position for review) */}
+      <BookingSection />
     </SmoothScroll>
   );
 }
