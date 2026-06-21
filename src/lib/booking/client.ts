@@ -22,14 +22,14 @@ const PREVIEW_FALLBACK = process.env.NEXT_PUBLIC_BOOKING_DEMO !== "false";
 
 export async function submitBooking(input: BookingInput): Promise<BookingResult> {
   try {
-    const res = await fetch("/api/bookings", {
+    const res = await fetch("/api/bookings/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
 
-    // Backend not deployed yet (static host / route missing) → preview the UX.
-    if (res.status === 404 || res.status === 501) {
+    // Route missing / not configured (e.g. static host) → preview the UX.
+    if (res.status === 404 || res.status === 501 || res.status === 503) {
       if (PREVIEW_FALLBACK) return previewResult(input);
       throw new BookingError("Booking service is not available yet.");
     }
@@ -42,7 +42,21 @@ export async function submitBooking(input: BookingInput): Promise<BookingResult>
         data?.fieldErrors
       );
     }
-    return data as BookingResult;
+
+    // The API returns { booking_reference, booking_id, manage_token }. The success
+    // screen also needs the chosen details, so merge them from the input.
+    return {
+      booking_reference: data.booking_reference,
+      name: input.name,
+      booking_date: input.booking_date,
+      booking_time: input.booking_time,
+      guests: input.guests,
+      meal_type: input.meal_type,
+      occasion: input.occasion ?? null,
+      manage_url: data.manage_token
+        ? `${typeof window !== "undefined" ? window.location.origin : ""}/manage?token=${data.manage_token}`
+        : undefined,
+    };
   } catch (err) {
     if (err instanceof BookingError) throw err;
     // Network failure (e.g. no API in this environment) → preview, or surface.
