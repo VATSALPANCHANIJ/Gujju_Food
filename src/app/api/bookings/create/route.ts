@@ -56,7 +56,22 @@ function json(body: unknown, status: number) {
   return NextResponse.json(body, { status });
 }
 
+// The existing `bookings.guests` column is INTEGER, but the form sends a range
+// chip ("1-2" | "3-4" | "5-6" | "7+"). Store the upper bound (party-size ceiling).
+const GUESTS_TO_INT: Record<string, number> = { "1-2": 2, "3-4": 4, "5-6": 6, "7+": 7 };
+function guestsToInt(range: string): number {
+  return GUESTS_TO_INT[range] ?? (Number.parseInt(range, 10) || 1);
+}
+
 export async function POST(req: Request) {
+  console.log("[booking] BOOKING API STARTED");
+  console.log(
+    "[booking] env — SUPABASE_URL set?",
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    "| SERVICE_ROLE set?",
+    !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
   // 1) Rate limit (anti-duplicate / abuse)
   if (isRateLimited(clientIp(req))) {
     return json(
@@ -97,7 +112,7 @@ export async function POST(req: Request) {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     phone: input.phone.trim(),
-    guests: input.guests,
+    guests: guestsToInt(input.guests),
     booking_date: input.booking_date,
     booking_time: input.booking_time,
     meal_type: input.meal_type,
@@ -110,11 +125,16 @@ export async function POST(req: Request) {
     const booking_reference = await nextBookingReference(admin);
     const manage_token = crypto.randomUUID();
 
+    console.log("[booking] INSERTING", { booking_reference, guests: payload.guests });
+
     const { data, error } = await admin
       .from("bookings")
       .insert({ ...payload, booking_reference, manage_token })
       .select("id, booking_reference, manage_token")
       .single();
+
+    console.log("[booking] INSERT RESULT", { ok: !error, id: data?.id ?? null, code: error?.code ?? null });
+    if (error) console.error("[booking] SUPABASE ERROR", error);
 
     if (!error && data) {
       return json(

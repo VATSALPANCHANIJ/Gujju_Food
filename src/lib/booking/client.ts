@@ -21,6 +21,12 @@ export class BookingError extends Error {
 const PREVIEW_FALLBACK = process.env.NEXT_PUBLIC_BOOKING_DEMO !== "false";
 
 export async function submitBooking(input: BookingInput): Promise<BookingResult> {
+  console.log("[booking] submitting → /api/bookings/create", {
+    date: input.booking_date,
+    time: input.booking_time,
+    guests: input.guests,
+    previewFallback: PREVIEW_FALLBACK,
+  });
   try {
     const res = await fetch("/api/bookings/create", {
       method: "POST",
