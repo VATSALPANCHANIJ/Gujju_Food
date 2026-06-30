@@ -50,25 +50,49 @@ function decodeJwtRole(token: string): string | null {
 // Validates that the configured key is a real service_role JWT. Catches the two
 // most common host misconfigurations: the ANON key pasted into the service var
 // (→ RLS blocks inserts), and a malformed/garbled value (→ "Invalid API key").
+// Supports BOTH key formats:
+//   • New Supabase secret key  → "sb_secret_..."        (opaque, NOT a JWT)
+//   • Legacy service_role key  → "eyJ..." JWT, role === "service_role"
+// and rejects the common mistakes (publishable/anon key, or a garbled paste).
 export function checkServiceRoleKey():
   | { ok: true }
   | { ok: false; reason: string } {
   if (!URL) return { ok: false, reason: "NEXT_PUBLIC_SUPABASE_URL is not set." };
   if (!SERVICE_ROLE_KEY) return { ok: false, reason: "SUPABASE_SERVICE_ROLE_KEY is not set." };
 
-  const role = decodeJwtRole(SERVICE_ROLE_KEY);
-  if (role === null) {
+  // New-format secret key (replaces the legacy service_role JWT). Server-only.
+  if (SERVICE_ROLE_KEY.startsWith("sb_secret_")) return { ok: true };
+
+  // New-format PUBLISHABLE key pasted into the secret slot → wrong key.
+  if (SERVICE_ROLE_KEY.startsWith("sb_publishable_")) {
     return {
       ok: false,
       reason:
-        "SUPABASE_SERVICE_ROLE_KEY is not a valid JWT (malformed paste — extra text, comment, or whitespace?).",
+        'SUPABASE_SERVICE_ROLE_KEY is a publishable key ("sb_publishable_…"). Use the SECRET key ("sb_secret_…").',
     };
   }
-  if (role !== "service_role") {
+
+  // Legacy JWT path.
+  const role = decodeJwtRole(SERVICE_ROLE_KEY);
+  if (role === "service_role") return { ok: true };
+  if (role === "anon") {
     return {
       ok: false,
-      reason: `SUPABASE_SERVICE_ROLE_KEY has role "${role}", expected "service_role" (looks like the anon key was pasted).`,
+      reason:
+        'SUPABASE_SERVICE_ROLE_KEY has role "anon" — that is the anon/publishable key. Use the service_role / secret key.',
     };
   }
-  return { ok: true };
+  if (role) {
+    return {
+      ok: false,
+      reason: `SUPABASE_SERVICE_ROLE_KEY has role "${role}", expected "service_role".`,
+    };
+  }
+
+  // Not an sb_* key and not a decodable JWT → unrecognised / garbled.
+  return {
+    ok: false,
+    reason:
+      'SUPABASE_SERVICE_ROLE_KEY is not a recognised key. Expected "sb_secret_…" (new) or a service_role JWT ("eyJ…"). Check for extra text, a comment, or whitespace.',
+  };
 }
