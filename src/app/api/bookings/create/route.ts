@@ -92,20 +92,35 @@ export async function POST(req: Request) {
   try {
     input = (await req.json()) as BookingInput;
   } catch {
+    console.warn("[booking] 400 — invalid JSON body");
     return json({ success: false, message: "Invalid request body." }, 400);
   }
+  console.log("[booking] request received", {
+    date: input?.booking_date,
+    time: input?.booking_time,
+    guests: input?.guests,
+    meal: input?.meal_type,
+  });
 
   // 3) Server-side validation (authoritative — never trust the client)
   const fieldErrors = validateBooking(input);
   if (!isValid(fieldErrors)) {
+    console.warn("[booking] 422 — validation failed:", Object.keys(fieldErrors));
     return json(
       { success: false, message: "Please check the highlighted fields.", fieldErrors },
       422
     );
   }
+  console.log("[booking] validation passed");
 
   // 4) Config guard
   if (!isSupabaseConfigured()) {
+    console.error(
+      "[booking] 503 — Supabase env missing. URL set?",
+      !!(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
+      "| SERVICE_ROLE set?",
+      !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
     return json(
       { success: false, message: "Booking service is not configured." },
       503
@@ -129,6 +144,7 @@ export async function POST(req: Request) {
   }
 
   const admin = getSupabaseAdmin();
+  console.log("[booking] supabase connected (service key valid)");
 
   // 5) Insert with reference-collision retry (handles concurrent inserts)
   const payload = {

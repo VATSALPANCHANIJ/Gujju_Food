@@ -12,7 +12,10 @@ if (typeof window !== "undefined") {
 // Env values are .trim()'d to survive copy-paste mistakes (trailing spaces /
 // newlines / accidental comments) — a common cause of "works locally, fails on
 // the host" because dashboards keep whatever was pasted verbatim.
-const URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+// URL: prefer a server-only SUPABASE_URL (read at RUNTIME) over NEXT_PUBLIC_*
+// (which is inlined at BUILD time — undefined on the server if it wasn't set
+// when the deployment was built). Either works; SUPABASE_URL is more robust.
+const URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
 const SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
 let cached: SupabaseClient | null = null;
