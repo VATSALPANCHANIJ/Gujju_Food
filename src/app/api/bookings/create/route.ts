@@ -155,7 +155,19 @@ export async function POST(req: Request) {
     // Any other DB error → stop
     if (error) {
       return json(
-        { success: false, message: "Could not save your reservation. Please try again." },
+        {
+          success: false,
+          message: "Could not save your reservation. Please try again.",
+          // TEMP production diagnostics — remove after root cause confirmed.
+          debug: {
+            code: (error as { code?: string }).code ?? null,
+            message: error.message ?? null,
+            hint: (error as { hint?: string }).hint ?? null,
+            details: (error as { details?: string }).details ?? null,
+            serviceKeyPresent: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+            urlPresent: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          },
+        },
         500
       );
     }
