@@ -5,10 +5,17 @@
 import { NextResponse } from "next/server";
 import { validateBooking, isValid } from "@/lib/booking/validation";
 import type { BookingInput } from "@/lib/booking/types";
-import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase-admin";
+import {
+  getSupabaseAdmin,
+  isSupabaseConfigured,
+  checkServiceRoleKey,
+} from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Set BOOKING_DEBUG=1 (env) to include DB error details in 500 responses.
+const DEBUG = process.env.BOOKING_DEBUG === "1";
 
 // ---- lightweight, rate-limit-ready guard (per warm instance) ----------------
 // For multi-instance hard limits, swap this Map for Upstash/Vercel KV.
@@ -105,6 +112,22 @@ export async function POST(req: Request) {
     );
   }
 
+  // 4b) Validate the service role key up front so a wrong/garbled key (the
+  // classic host env-var mistake) fails with a precise, actionable message
+  // instead of an opaque insert error.
+  const keyCheck = checkServiceRoleKey();
+  if (!keyCheck.ok) {
+    console.error("[booking] SERVICE ROLE KEY INVALID:", keyCheck.reason);
+    return json(
+      {
+        success: false,
+        message: "Booking service is misconfigured. Please contact us.",
+        debug: DEBUG ? { reason: keyCheck.reason } : undefined,
+      },
+      500
+    );
+  }
+
   const admin = getSupabaseAdmin();
 
   // 5) Insert with reference-collision retry (handles concurrent inserts)
@@ -158,15 +181,14 @@ export async function POST(req: Request) {
         {
           success: false,
           message: "Could not save your reservation. Please try again.",
-          // TEMP production diagnostics — remove after root cause confirmed.
-          debug: {
-            code: (error as { code?: string }).code ?? null,
-            message: error.message ?? null,
-            hint: (error as { hint?: string }).hint ?? null,
-            details: (error as { details?: string }).details ?? null,
-            serviceKeyPresent: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-            urlPresent: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-          },
+          debug: DEBUG
+            ? {
+                code: (error as { code?: string }).code ?? null,
+                message: error.message ?? null,
+                hint: (error as { hint?: string }).hint ?? null,
+                details: (error as { details?: string }).details ?? null,
+              }
+            : undefined,
         },
         500
       );
