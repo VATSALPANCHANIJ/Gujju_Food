@@ -1,0 +1,175 @@
+// POST /api/bookings/create
+// Flow: validate → insert into Supabase → append to Google Sheets → 201.
+// A Google append failure returns 500 (the booking is already in Supabase;
+// the failure is surfaced, never silently ignored).
+
+import { NextResponse } from "next/server";
+import { validateBooking, isValid } from "@/lib/booking/validation";
+import type { BookingInput } from "@/lib/booking/types";
+import {
+  getSupabaseAdmin,
+  isSupabaseConfigured,
+  checkServiceRoleKey,
+} from "@/lib/supabase-admin";
+import { appendBookingToSheet } from "@/lib/google-sheet";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// ---- lightweight, rate-limit-ready guard (per warm instance) ----------------
+const RATE_LIMIT = { max: 6, windowMs: 60_000 };
+const hits = new Map<string, { count: number; start: number }>();
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const rec = hits.get(ip);
+  if (!rec || now - rec.start > RATE_LIMIT.windowMs) {
+    hits.set(ip, { count: 1, start: now });
+    return false;
+  }
+  rec.count += 1;
+  return rec.count > RATE_LIMIT.max;
+}
+function clientIp(req: Request): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+// The existing `bookings.guests` column is INTEGER; the form sends a range chip.
+const GUESTS_TO_INT: Record<string, number> = { "1-2": 2, "3-4": 4, "5-6": 6, "7+": 7 };
+function guestsToInt(range: string): number {
+  return GUESTS_TO_INT[range] ?? (Number.parseInt(range, 10) || 1);
+}
+
+// Booking reference: GFH-<year>-0001 (sequential per year).
+async function nextBookingReference(admin: ReturnType<typeof getSupabaseAdmin>): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `GFH-${year}-`;
+  const { data, error } = await admin
+    .from("bookings")
+    .select("booking_reference")
+    .like("booking_reference", `${prefix}%`)
+    .order("booking_reference", { ascending: false })
+    .limit(1);
+  let next = 1;
+  if (!error && data && data.length > 0) {
+    const n = parseInt(String(data[0].booking_reference).slice(prefix.length), 10);
+    if (Number.isFinite(n)) next = n + 1;
+  }
+  return `${prefix}${String(next).padStart(4, "0")}`;
+}
+
+function json(body: unknown, status: number) {
+  return NextResponse.json(body, { status });
+}
+
+export async function POST(req: Request) {
+  console.log("[booking] API Started");
+
+  if (isRateLimited(clientIp(req))) {
+    return json({ success: false, message: "Too many requests. Please wait a moment and try again." }, 429);
+  }
+
+  // 1) Validate request
+  let input: BookingInput;
+  try {
+    input = (await req.json()) as BookingInput;
+  } catch {
+    return json({ success: false, message: "Invalid request body." }, 400);
+  }
+  const fieldErrors = validateBooking(input);
+  if (!isValid(fieldErrors)) {
+    return json({ success: false, message: "Please check the highlighted fields.", fieldErrors }, 422);
+  }
+
+  // Config guards
+  if (!isSupabaseConfigured()) {
+    return json({ success: false, message: "Booking service is not configured." }, 503);
+  }
+  const keyCheck = checkServiceRoleKey();
+  if (!keyCheck.ok) {
+    console.error("[booking] SERVICE ROLE KEY INVALID:", keyCheck.reason);
+    return json({ success: false, message: "Booking service is misconfigured." }, 500);
+  }
+
+  const admin = getSupabaseAdmin();
+
+  const payload = {
+    name: input.name.trim(),
+    email: input.email.trim().toLowerCase(),
+    phone: input.phone.trim(),
+    guests: guestsToInt(input.guests),
+    booking_date: input.booking_date,
+    booking_time: input.booking_time,
+    meal_type: input.meal_type,
+    occasion: input.occasion ?? null,
+    special_request: input.special_request?.trim() || null,
+    status: "pending" as const,
+  };
+
+  // 2) Save booking to Supabase (retry on reference collision)
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const booking_reference = await nextBookingReference(admin);
+    const manage_token = crypto.randomUUID();
+
+    const { data, error } = await admin
+      .from("bookings")
+      .insert({ ...payload, booking_reference, manage_token })
+      .select("id, booking_reference, manage_token, created_at")
+      .single();
+
+    // 23505 = unique_violation (reference race) → recompute and retry
+    if (error && (error as { code?: string }).code === "23505") continue;
+
+    if (error || !data) {
+      console.error("[booking] SUPABASE ERROR", error);
+      return json({ success: false, message: "Could not save your reservation. Please try again." }, 500);
+    }
+
+    // 3) Log successful insert
+    console.log("[booking] Supabase insert successful", data.booking_reference);
+
+    // 4-6) Append to Google Sheets — awaited BEFORE returning success.
+    // On failure: log the full error and return 500 (do NOT silently ignore).
+    try {
+      console.log("[booking] Calling appendBookingToSheet()");
+      await appendBookingToSheet({
+        booking_reference: data.booking_reference,
+        name: payload.name,
+        phone: payload.phone,
+        email: payload.email,
+        created_at: (data as { created_at?: string }).created_at ?? null,
+        booking_date: payload.booking_date,
+        booking_time: payload.booking_time,
+        guests: payload.guests,
+        meal_type: payload.meal_type,
+        occasion: payload.occasion,
+        special_request: payload.special_request,
+        status: payload.status,
+      });
+      console.log("[booking] Google append successful");
+    } catch (sheetErr) {
+      console.error("[booking] Google append failed:", sheetErr);
+      return json(
+        {
+          success: false,
+          message: "Reservation saved, but syncing to Google Sheets failed. Please contact us.",
+          booking_reference: data.booking_reference,
+        },
+        500
+      );
+    }
+
+    // 7) Return success
+    return json(
+      {
+        success: true,
+        message: "Your table has been reserved.",
+        booking_id: data.id,
+        booking_reference: data.booking_reference,
+        manage_token: data.manage_token,
+      },
+      201
+    );
+  }
+
+  return json({ success: false, message: "Could not generate a unique booking reference. Please retry." }, 500);
+}
