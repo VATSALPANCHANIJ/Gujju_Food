@@ -10,6 +10,7 @@ import {
   isSupabaseConfigured,
   checkServiceRoleKey,
 } from "@/lib/supabase-admin";
+import { appendBookingToSheet } from "@/lib/google-sheet";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,20 +93,35 @@ export async function POST(req: Request) {
   try {
     input = (await req.json()) as BookingInput;
   } catch {
+    console.warn("[booking] 400 — invalid JSON body");
     return json({ success: false, message: "Invalid request body." }, 400);
   }
+  console.log("[booking] request received", {
+    date: input?.booking_date,
+    time: input?.booking_time,
+    guests: input?.guests,
+    meal: input?.meal_type,
+  });
 
   // 3) Server-side validation (authoritative — never trust the client)
   const fieldErrors = validateBooking(input);
   if (!isValid(fieldErrors)) {
+    console.warn("[booking] 422 — validation failed:", Object.keys(fieldErrors));
     return json(
       { success: false, message: "Please check the highlighted fields.", fieldErrors },
       422
     );
   }
+  console.log("[booking] validation passed");
 
   // 4) Config guard
   if (!isSupabaseConfigured()) {
+    console.error(
+      "[booking] 503 — Supabase env missing. URL set?",
+      !!(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
+      "| SERVICE_ROLE set?",
+      !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
     return json(
       { success: false, message: "Booking service is not configured." },
       503
@@ -129,6 +145,7 @@ export async function POST(req: Request) {
   }
 
   const admin = getSupabaseAdmin();
+  console.log("[booking] supabase connected (service key valid)");
 
   // 5) Insert with reference-collision retry (handles concurrent inserts)
   const payload = {
@@ -153,13 +170,39 @@ export async function POST(req: Request) {
     const { data, error } = await admin
       .from("bookings")
       .insert({ ...payload, booking_reference, manage_token })
-      .select("id, booking_reference, manage_token")
+      .select("id, booking_reference, manage_token, created_at")
       .single();
 
     console.log("[booking] INSERT RESULT", { ok: !error, id: data?.id ?? null, code: error?.code ?? null });
     if (error) console.error("[booking] SUPABASE ERROR", error);
 
     if (!error && data) {
+      console.log("[booking] Supabase insert successful", data.booking_reference);
+
+      // Mirror to Google Sheets. Supabase is the source of truth; a Sheets
+      // failure is logged but MUST NOT fail the booking (already saved).
+      // Awaited so the row is written before we return success.
+      try {
+        console.log("[booking] Calling Google Sheets append");
+        await appendBookingToSheet({
+          booking_reference: data.booking_reference,
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          guests: payload.guests,
+          booking_date: payload.booking_date,
+          booking_time: payload.booking_time,
+          meal_type: payload.meal_type,
+          occasion: payload.occasion,
+          special_request: payload.special_request,
+          status: payload.status,
+          created_at: (data as { created_at?: string }).created_at ?? null,
+        });
+        console.log("[booking] Google append successful");
+      } catch (sheetErr) {
+        console.error("[booking] Google append failed", sheetErr);
+      }
+
       return json(
         {
           success: true,
