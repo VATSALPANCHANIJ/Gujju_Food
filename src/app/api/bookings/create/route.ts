@@ -177,9 +177,13 @@ export async function POST(req: Request) {
     if (error) console.error("[booking] SUPABASE ERROR", error);
 
     if (!error && data) {
+      console.log("[booking] Supabase insert successful", data.booking_reference);
+
       // Mirror to Google Sheets. Supabase is the source of truth; a Sheets
       // failure is logged but MUST NOT fail the booking (already saved).
+      // Awaited so the row is written before we return success.
       try {
+        console.log("[booking] Calling Google Sheets append");
         await appendBookingToSheet({
           booking_reference: data.booking_reference,
           name: payload.name,
@@ -194,8 +198,9 @@ export async function POST(req: Request) {
           status: payload.status,
           created_at: (data as { created_at?: string }).created_at ?? null,
         });
+        console.log("[booking] Google append successful");
       } catch (sheetErr) {
-        console.error("[Google Sheets] Failed to append booking", sheetErr);
+        console.error("[booking] Google append failed", sheetErr);
       }
 
       return json(
