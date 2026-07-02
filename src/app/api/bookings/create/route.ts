@@ -10,6 +10,7 @@ import {
   isSupabaseConfigured,
   checkServiceRoleKey,
 } from "@/lib/supabase-admin";
+import { appendBookingToSheet } from "@/lib/google-sheet";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -169,13 +170,34 @@ export async function POST(req: Request) {
     const { data, error } = await admin
       .from("bookings")
       .insert({ ...payload, booking_reference, manage_token })
-      .select("id, booking_reference, manage_token")
+      .select("id, booking_reference, manage_token, created_at")
       .single();
 
     console.log("[booking] INSERT RESULT", { ok: !error, id: data?.id ?? null, code: error?.code ?? null });
     if (error) console.error("[booking] SUPABASE ERROR", error);
 
     if (!error && data) {
+      // Mirror to Google Sheets. Supabase is the source of truth; a Sheets
+      // failure is logged but MUST NOT fail the booking (already saved).
+      try {
+        await appendBookingToSheet({
+          booking_reference: data.booking_reference,
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          guests: payload.guests,
+          booking_date: payload.booking_date,
+          booking_time: payload.booking_time,
+          meal_type: payload.meal_type,
+          occasion: payload.occasion,
+          special_request: payload.special_request,
+          status: payload.status,
+          created_at: (data as { created_at?: string }).created_at ?? null,
+        });
+      } catch (sheetErr) {
+        console.error("[Google Sheets] Failed to append booking", sheetErr);
+      }
+
       return json(
         {
           success: true,
