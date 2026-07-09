@@ -2,4 +2,10 @@ node_modules
 
 .next/
 node_modules/
+
+# env files — keep secrets out of git. .env.example (template) stays tracked.
 .env
+.env.local
+.env*.local
+.env.development
+.env.production
