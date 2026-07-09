@@ -7,6 +7,7 @@ import HeroSequence from "@/components/HeroSequence";
 import TextOverlay from "@/components/TextOverlay";
 import ProductShowcase from "@/components/ProductShowcase";
 import BookingSection from "@/components/Booking/BookingSection";
+import FooterLock from "@/components/admin/FooterLock";
 
 export default function Home() {
   const [preloadProgress, setPreloadProgress] = useState(0);
@@ -53,6 +54,9 @@ export default function Home() {
 
       {/* 4. TABLE BOOKING — self-contained, portable (temporary position for review) */}
       <BookingSection />
+
+      {/* 5. FOOTER — hidden owner-access lock (only the owner knows it opens login) */}
+      <FooterLock />
     </SmoothScroll>
   );
 }
