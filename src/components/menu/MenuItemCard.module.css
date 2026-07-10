@@ -1,0 +1,114 @@
+.item {
+  display: flex;
+  gap: 0.95rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+}
+
+.thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(150deg, #f1e5cd, #e4d3b2);
+  box-shadow: 0 6px 14px -8px rgba(60, 45, 20, 0.55),
+    inset 0 0 0 1px rgba(176, 134, 63, 0.35);
+  display: grid;
+  place-items: center;
+}
+
+.img { object-fit: cover; }
+
+.mono {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #9a7d4e;
+  letter-spacing: 0.02em;
+}
+
+.body { flex: 1; min-width: 0; }
+
+.topline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.name {
+  font-family: var(--font-serif);
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0e3b34;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+/* dotted leader, like a printed menu */
+.leader {
+  flex: 1;
+  height: 0;
+  border-bottom: 1px dotted rgba(14, 59, 52, 0.35);
+  transform: translateY(-3px);
+  min-width: 12px;
+}
+
+.price {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #14602e;
+  white-space: nowrap;
+}
+
+.desc {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #6c7671;
+  margin: 0.28rem 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.variants {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.variants li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.74rem;
+  color: #5b6560;
+}
+
+.variantPrice { font-weight: 700; color: #14602e; }
+
+.note {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-style: italic;
+  color: #b0863f;
+}
+
+@media (max-width: 900px) {
+  .thumb { width: 62px; height: 62px; }
+  .name { font-size: 0.95rem; }
+  .desc { -webkit-line-clamp: 2; line-clamp: 2; }
+}

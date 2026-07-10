@@ -6,6 +6,7 @@ import SmoothScroll from "@/components/SmoothScroll";
 import HeroSequence from "@/components/HeroSequence";
 import TextOverlay from "@/components/TextOverlay";
 import ProductShowcase from "@/components/ProductShowcase";
+import MenuSection from "@/components/home/MenuSection/MenuSection";
 import BookingSection from "@/components/Booking/BookingSection";
 import FooterLock from "@/components/admin/FooterLock";
 
@@ -52,7 +53,10 @@ export default function Home() {
       {/* 3. SIGNATURE FAVOURITES — pinned product showcase (Section 02) */}
       <ProductShowcase />
 
-      {/* 4. TABLE BOOKING — self-contained, portable (temporary position for review) */}
+      {/* 4. MENU SECTION — premium menu, cards from src/data/menu-preview.ts */}
+      <MenuSection />
+
+      {/* 5. TABLE BOOKING — self-contained, portable (temporary position for review) */}
       <BookingSection />
 
       {/* 5. FOOTER — hidden owner-access lock (only the owner knows it opens login) */}
