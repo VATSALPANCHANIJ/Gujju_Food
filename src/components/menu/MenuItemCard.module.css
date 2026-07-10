@@ -67,17 +67,13 @@
   white-space: nowrap;
 }
 
+/* No line clamp: descriptions must never be cut — pagination guarantees fit. */
 .desc {
   font-family: var(--font-sans);
   font-size: 0.78rem;
   line-height: 1.45;
   color: #6c7671;
   margin: 0.28rem 0 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .variants {
@@ -110,5 +106,4 @@
 @media (max-width: 900px) {
   .thumb { width: 62px; height: 62px; }
   .name { font-size: 0.95rem; }
-  .desc { -webkit-line-clamp: 2; line-clamp: 2; }
 }

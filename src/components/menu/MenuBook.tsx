@@ -5,8 +5,13 @@
 //  • Leaf model: each leaf is a sheet of paper with a FRONT and a BACK face.
 //      desktop → leaf i = { front: pages[2i], back: pages[2i+1] }  (two-page spread)
 //      mobile  → leaf i = { front: pages[i],  back: blank paper }  (single page)
+//  • HARDCOVER: the book opens closed — only the front cover is visible, centred.
+//    Turning leaf 0 swings the cover open and slides the stage into the spread.
+//    Turning the last leaf closes the back cover, leaving only it visible.
 //  • Flipping is a real 3D rotation around the spine (GSAP, rotationY 0 → -180)
 //    with a mid-turn shadow sweep for the paper-curl feel. Never instant.
+//  • Pages can be turned by button, arrow keys, or by dragging/swiping the page
+//    itself — the paper follows the pointer and settles or springs back.
 //  • Choosing a category flips through every intervening leaf, one after another.
 //  • Turning pages manually re-highlights the category (two-way sync), because
 //    the active category is DERIVED from the current leaf.
@@ -32,6 +37,8 @@ interface Leaf {
 const FLIP_DURATION = 0.85;
 const FLIP_OVERLAP = 0.55; // consecutive turns overlap, so the book "riffles"
 const FLIP_STEP = FLIP_DURATION - FLIP_OVERLAP;
+const DRAG_THRESHOLD = 6; // px before a drag claims a direction
+const DRAG_COMMIT = 0.3; // release past 30% → complete the turn
 
 /* ------------------------------------------------------------------ faces */
 
@@ -64,7 +71,6 @@ function PageFace({ page, pageNo }: { page: BookPage | null; pageNo?: number }) 
   }
 
   if (page.kind === "filler") {
-    // Decorative flourish page — keeps each category on whole spreads.
     return (
       <div className={`${styles.page} ${styles.filler}`}>
         <div className={styles.fillerInner}>
@@ -113,12 +119,21 @@ export default function MenuBook() {
   const [animating, setAnimating] = useState(false);
 
   const bookRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const slabLeftRef = useRef<HTMLDivElement>(null);
+  const slabRightRef = useRef<HTMLDivElement>(null);
+  const spineRef = useRef<HTMLDivElement>(null);
+
   const flippedRef = useRef(0);
   const animRef = useRef(false);
+  const mobileRef = useRef(false);
 
   useEffect(() => {
     flippedRef.current = flipped;
   }, [flipped]);
+  useEffect(() => {
+    mobileRef.current = isMobile;
+  }, [isMobile]);
 
   // ---- responsive mode (converts the flip position so you keep your place) --
   useEffect(() => {
@@ -149,6 +164,7 @@ export default function MenuBook() {
   }, [pages, isMobile]);
 
   const maxFlipped = leaves.length;
+  const lastLeaf = leaves.length - 1;
 
   /** Leaves are queried from the DOM, so no ref array can go stale mid-render. */
   const leafAt = useCallback(
@@ -156,18 +172,86 @@ export default function MenuBook() {
     []
   );
 
-  // ---- baseline rotation + z-order (re-applied when the leaf set changes) --
+  /** Width of one page — the drag distance that equals a full turn. */
+  const pageWidth = useCallback(
+    () => (bookRef.current ? bookRef.current.clientWidth / (mobileRef.current ? 1 : 2) : 420),
+    []
+  );
+
+  /** Closed front → shift right; closed back → shift left. Desktop only. */
+  const stageXFor = useCallback(
+    (f: number) => {
+      if (mobileRef.current) return 0;
+      const pw = pageWidth();
+      if (f === 0) return -pw / 2; // only the front cover, centred
+      if (f === maxFlipped) return pw / 2; // only the back cover, centred
+      return 0;
+    },
+    [maxFlipped, pageWidth]
+  );
+
+  // ---- baseline rotation, z-order and hardcover state ---------------------
   useEffect(() => {
     const f = flippedRef.current;
     for (let i = 0; i < leaves.length; i++) {
       const el = leafAt(i);
       if (!el) continue;
       gsap.set(el, { rotationY: i < f ? -180 : 0, zIndex: i < f ? i : leaves.length - i });
-      el.querySelectorAll<HTMLElement>("[data-shade]").forEach((s) =>
-        gsap.set(s, { opacity: 0 })
-      );
+      el.querySelectorAll<HTMLElement>("[data-shade]").forEach((s) => gsap.set(s, { opacity: 0 }));
     }
-  }, [leaves, leafAt]);
+    gsap.set(stageRef.current, { x: stageXFor(f) });
+    const closedFront = !mobileRef.current && f === 0;
+    const closedBack = !mobileRef.current && f === maxFlipped;
+    gsap.set(slabLeftRef.current, { autoAlpha: closedFront ? 0 : 1 });
+    gsap.set(slabRightRef.current, { autoAlpha: closedBack ? 0 : 1 });
+    gsap.set(spineRef.current, { autoAlpha: closedFront || closedBack ? 0 : 1 });
+  }, [leaves, leafAt, maxFlipped, stageXFor]);
+
+  /**
+   * Adds one leaf turn to `tl` at time `at`, including the hardcover choreography
+   * when the leaf being turned is the front or back cover.
+   */
+  const addLeafTurn = useCallback(
+    (tl: gsap.core.Timeline, i: number, forward: boolean, at: number, k = 0) => {
+      const el = leafAt(i);
+      if (!el) return;
+      const shades = el.querySelectorAll<HTMLElement>("[data-shade]");
+      const end = at + FLIP_DURATION;
+
+      tl.set(el, { zIndex: leaves.length + 10 + k }, at)
+        .to(
+          el,
+          { rotationY: forward ? -180 : 0, duration: FLIP_DURATION, ease: "power2.inOut" },
+          at
+        )
+        // paper darkens through the middle of the turn, then lifts — the curl
+        .fromTo(
+          shades,
+          { opacity: 0 },
+          { opacity: 0.4, duration: FLIP_DURATION / 2, ease: "sine.in", yoyo: true, repeat: 1 },
+          at
+        )
+        .set(el, { zIndex: forward ? i : leaves.length - i }, end);
+
+      if (mobileRef.current) return;
+      const pw = pageWidth();
+      const fade = FLIP_DURATION * 0.6;
+
+      if (i === 0) {
+        // front cover swinging open (or closing back down)
+        tl.to(stageRef.current, { x: forward ? 0 : -pw / 2, duration: FLIP_DURATION, ease: "power2.inOut" }, at)
+          .to(slabLeftRef.current, { autoAlpha: forward ? 1 : 0, duration: fade }, at)
+          .to(spineRef.current, { autoAlpha: forward ? 1 : 0, duration: fade }, at);
+      }
+      if (i === lastLeaf) {
+        // back cover closing down (or re-opening)
+        tl.to(stageRef.current, { x: forward ? pw / 2 : 0, duration: FLIP_DURATION, ease: "power2.inOut" }, at)
+          .to(slabRightRef.current, { autoAlpha: forward ? 0 : 1, duration: fade }, at)
+          .to(spineRef.current, { autoAlpha: forward ? 0 : 1, duration: fade }, at);
+      }
+    },
+    [lastLeaf, leafAt, leaves.length, pageWidth]
+  );
 
   // ---- flip to an arbitrary leaf, one page at a time ----------------------
   const goToLeaf = useCallback(
@@ -176,13 +260,12 @@ export default function MenuBook() {
       const from = flippedRef.current;
       if (animRef.current || clamped === from) return;
 
-      // Collect the leaves to turn, in order.
       const turns: { i: number; forward: boolean }[] = [];
       if (clamped > from) for (let i = from; i < clamped; i++) turns.push({ i, forward: true });
       else for (let i = from - 1; i >= clamped; i--) turns.push({ i, forward: false });
 
       const usable = turns.filter((t) => leafAt(t.i));
-      if (usable.length === 0) return; // nothing to animate — never strand `animating`
+      if (usable.length === 0) return; // never strand `animating`
 
       animRef.current = true;
       setAnimating(true);
@@ -195,45 +278,114 @@ export default function MenuBook() {
       });
 
       usable.forEach((turn, k) => {
-        const el = leafAt(turn.i)!;
-        const shades = el.querySelectorAll<HTMLElement>("[data-shade]");
         const at = k * FLIP_STEP;
-        const end = at + FLIP_DURATION;
-
-        master
-          // lift the turning leaf above both stacks (+k keeps overlapping turns ordered)
-          .set(el, { zIndex: leaves.length + 10 + k }, at)
-          .to(
-            el,
-            { rotationY: turn.forward ? -180 : 0, duration: FLIP_DURATION, ease: "power2.inOut" },
-            at
-          )
-          // paper darkens through the middle of the turn, then lifts — the curl
-          .fromTo(
-            shades,
-            { opacity: 0 },
-            {
-              opacity: 0.4,
-              duration: FLIP_DURATION / 2,
-              ease: "sine.in",
-              yoyo: true,
-              repeat: 1,
-            },
-            at
-          )
-          .call(
-            () => {
-              flippedRef.current = turn.forward ? turn.i + 1 : turn.i;
-              setFlipped(flippedRef.current);
-            },
-            undefined,
-            end
-          )
-          .set(el, { zIndex: turn.forward ? turn.i : leaves.length - turn.i }, end);
+        addLeafTurn(master, turn.i, turn.forward, at, k);
+        master.call(
+          () => {
+            flippedRef.current = turn.forward ? turn.i + 1 : turn.i;
+            setFlipped(flippedRef.current);
+          },
+          undefined,
+          at + FLIP_DURATION
+        );
       });
     },
-    [leafAt, leaves.length, maxFlipped]
+    [addLeafTurn, leafAt, maxFlipped]
   );
+
+  // ---- drag / swipe -------------------------------------------------------
+  const drag = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    leaf: number;
+    forward: boolean;
+    tl: gsap.core.Timeline | null;
+  }>({ active: false, startX: 0, startY: 0, leaf: -1, forward: true, tl: null });
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    if (animRef.current) return;
+    // ignore drags that begin on the nav buttons
+    if ((e.target as HTMLElement).closest("button")) return;
+    drag.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      leaf: -1,
+      forward: true,
+      tl: null,
+    };
+  }, []);
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const d = drag.current;
+      if (!d.active || animRef.current) return;
+
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+
+      // Claim a direction (and build the paused turn) on the first real move.
+      if (d.leaf < 0) {
+        if (Math.abs(dx) < DRAG_THRESHOLD) return;
+        if (Math.abs(dy) > Math.abs(dx)) {
+          d.active = false; // vertical → let the page scroll
+          return;
+        }
+        const forward = dx < 0;
+        const f = flippedRef.current;
+        const leaf = forward ? f : f - 1;
+        if (leaf < 0 || leaf >= leaves.length) {
+          d.active = false;
+          return;
+        }
+        const tl = gsap.timeline({ paused: true });
+        addLeafTurn(tl, leaf, forward, 0);
+        d.leaf = leaf;
+        d.forward = forward;
+        d.tl = tl;
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      }
+
+      if (d.tl) {
+        const p = Math.max(0, Math.min(1, Math.abs(dx) / pageWidth()));
+        d.tl.progress(p);
+      }
+    },
+    [addLeafTurn, leaves.length, pageWidth]
+  );
+
+  const endDrag = useCallback(() => {
+    const d = drag.current;
+    if (!d.active || !d.tl) {
+      drag.current.active = false;
+      return;
+    }
+    const tl = d.tl;
+    const leaf = d.leaf;
+    const forward = d.forward;
+    const p = tl.progress();
+    drag.current = { active: false, startX: 0, startY: 0, leaf: -1, forward: true, tl: null };
+
+    animRef.current = true;
+    setAnimating(true);
+
+    const commit = p > DRAG_COMMIT;
+    gsap.to(tl, {
+      progress: commit ? 1 : 0,
+      duration: FLIP_DURATION * (commit ? 1 - p : p) * 0.9 + 0.12,
+      ease: commit ? "power2.out" : "power2.inOut",
+      onComplete: () => {
+        if (commit) {
+          flippedRef.current = forward ? leaf + 1 : leaf;
+          setFlipped(flippedRef.current);
+        }
+        tl.kill();
+        animRef.current = false;
+        setAnimating(false);
+      },
+    });
+  }, []);
 
   // ---- derived: which category is on screen right now (manual-flip sync) ---
   const activeCategory = useMemo<MenuCategory | null>(() => {
@@ -246,7 +398,7 @@ export default function MenuBook() {
   const goToCategory = useCallback(
     (category: MenuCategory | null) => {
       if (category === null) {
-        goToLeaf(0); // back to the cover
+        goToLeaf(0); // back to the closed cover
         return;
       }
       const p = firstPageOfCategory(pages, category);
@@ -269,32 +421,51 @@ export default function MenuBook() {
     return () => window.removeEventListener("keydown", onKey);
   }, [next, prev]);
 
+  const closedFront = flipped === 0;
+  const closedBack = flipped === maxFlipped;
+
   return (
     <div className={styles.wrap}>
       <CategoryFilter active={activeCategory} onSelect={goToCategory} disabled={animating} />
 
       <div
         ref={bookRef}
-        className={`${styles.book} ${isMobile ? styles.single : ""}`}
+        className={[
+          styles.book,
+          isMobile ? styles.single : "",
+          closedFront ? styles.closedFront : "",
+          closedBack ? styles.closedBack : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         role="group"
-        aria-label="Menu book"
+        aria-label="Menu book — drag or swipe a page to turn it"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={endDrag}
       >
-        <div className={styles.spine} aria-hidden="true" />
-        <div className={styles.edgeLeft} aria-hidden="true" />
-        <div className={styles.edgeRight} aria-hidden="true" />
+        <div ref={stageRef} className={styles.stage}>
+          <div ref={slabLeftRef} className={styles.slabLeft} aria-hidden="true" />
+          <div ref={slabRightRef} className={styles.slabRight} aria-hidden="true" />
+          <div ref={spineRef} className={styles.spine} aria-hidden="true" />
+          <div className={styles.edgeLeft} aria-hidden="true" />
+          <div className={styles.edgeRight} aria-hidden="true" />
 
-        {leaves.map((leaf, i) => (
-          <div key={i} data-leaf={i} className={styles.leaf}>
-            <div className={`${styles.face} ${styles.front}`}>
-              <PageFace page={leaf.front} pageNo={isMobile ? i + 1 : 2 * i + 1} />
-              <div className={styles.shade} data-shade="front" aria-hidden="true" />
+          {leaves.map((leaf, i) => (
+            <div key={i} data-leaf={i} className={styles.leaf}>
+              <div className={`${styles.face} ${styles.front}`}>
+                <PageFace page={leaf.front} pageNo={isMobile ? i + 1 : 2 * i + 1} />
+                <div className={styles.shade} data-shade="front" aria-hidden="true" />
+              </div>
+              <div className={`${styles.face} ${styles.back}`}>
+                <PageFace page={leaf.back} pageNo={leaf.back ? 2 * i + 2 : undefined} />
+                <div className={styles.shade} data-shade="back" aria-hidden="true" />
+              </div>
             </div>
-            <div className={`${styles.face} ${styles.back}`}>
-              <PageFace page={leaf.back} pageNo={leaf.back ? 2 * i + 2 : undefined} />
-              <div className={styles.shade} data-shade="back" aria-hidden="true" />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <div className={styles.controls}>
@@ -302,26 +473,28 @@ export default function MenuBook() {
           type="button"
           className={styles.navBtn}
           onClick={prev}
-          disabled={animating || flipped === 0}
+          disabled={animating || closedFront}
           aria-label="Previous page"
         >
           ←
         </button>
         <span className={styles.progress}>
-          {activeCategory ?? (flipped === 0 ? "Cover" : "Thank You")}
+          {activeCategory ?? (closedFront ? "Cover" : "Thank You")}
         </span>
         <button
           type="button"
           className={styles.navBtn}
           onClick={next}
-          disabled={animating || flipped === maxFlipped}
+          disabled={animating || closedBack}
           aria-label="Next page"
         >
           →
         </button>
       </div>
 
-      <p className={styles.hint}>Use ← → keys, or pick a category above to flip through.</p>
+      <p className={styles.hint}>
+        Drag or swipe a page to turn it · use ← → keys · or pick a category above.
+      </p>
     </div>
   );
 }

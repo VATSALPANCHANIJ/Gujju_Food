@@ -612,7 +612,74 @@ export const MENU_ITEMS: MenuItem[] = [
 // Book pagination — multiple products per page, each category starts a new page.
 // ---------------------------------------------------------------------------
 
-export const ITEMS_PER_PAGE = 4;
+// ---------------------------------------------------------------------------
+// Height-based pagination. A fixed items-per-page count clips tall items (long
+// descriptions, priced variants), so instead we estimate each item's rendered
+// height and fill a page up to a budget. An item is NEVER split across pages —
+// if it doesn't fit, it starts the next page.
+//
+// Units are CSS px and mirror MenuItemCard.module.css / MenuBook.module.css.
+// Desktop is the binding constraint (narrower body column → more wrapped lines),
+// so one pagination serves both modes and page indices stay identical.
+// ---------------------------------------------------------------------------
+
+// Calibrated against measured DOM heights in BOTH modes, taking the worst case
+// of each dimension so a page can never overflow in either layout:
+//   • available height — mobile 363px  vs desktop 371px  → use 363 (minus margin)
+//   • chars per line   — mobile ~27.8  vs desktop ~36    → use 28
+//   • thumb floor      — mobile 62px   vs desktop 74px   → use 74
+// Every constant rounds UP so the estimate is never optimistic.
+
+/** Usable height of `.pageItems` — measured minimum is 363px (mobile). */
+const PAGE_BUDGET = 358;
+
+const ITEM_GAP = 9; // .pageItems gap (0.55rem → 8.8px)
+const THUMB_H = 74; // .thumb sets the row's floor (desktop is taller)
+const ITEM_PAD = 16; // .item padding (0.5rem top + bottom)
+const SAFETY = 2; // per-item rounding cushion
+const NAME_H = 20; // .name line (1.02rem × 1.2)
+const DESC_LINE = 19; // .desc line-height (measured 18.1px)
+const DESC_CPL = 28; // chars per line in the narrowest (mobile) body column
+const DESC_MT = 5; // .desc margin-top
+const VAR_LINE = 20; // .variants li + row gap
+const VAR_MT = 10; // .variants margin-top
+const NOTE_H = 25; // .note + margin-top
+
+/** Conservative estimate of one rendered MenuItemCard, in px. */
+export function estimateItemHeight(item: MenuItem): number {
+  let body = NAME_H;
+  if (item.description) {
+    body += DESC_MT + Math.ceil(item.description.length / DESC_CPL) * DESC_LINE;
+  }
+  if (item.variants) body += VAR_MT + item.variants.length * VAR_LINE;
+  if (item.note) body += NOTE_H;
+  // The row is a flex pair: the circular thumb sets a floor.
+  return Math.max(THUMB_H, body) + ITEM_PAD + SAFETY;
+}
+
+/** Greedily fill pages to PAGE_BUDGET without ever splitting an item. */
+function packItemsIntoPages(items: MenuItem[]): MenuItem[][] {
+  const pages: MenuItem[][] = [];
+  let current: MenuItem[] = [];
+  let height = 0;
+
+  for (const item of items) {
+    const h = estimateItemHeight(item);
+    const added = current.length > 0 ? ITEM_GAP + h : h;
+
+    if (current.length > 0 && height + added > PAGE_BUDGET) {
+      pages.push(current);
+      current = [item];
+      height = h; // a lone oversized item still gets its own page — never split
+    } else {
+      current.push(item);
+      height += added;
+    }
+  }
+
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
 
 export type BookPage =
   | { kind: "cover" }
@@ -643,10 +710,7 @@ export function buildPages(): BookPage[] {
     const items = MENU_ITEMS.filter((i) => i.category === category);
     if (items.length === 0) continue;
 
-    const chunks: MenuItem[][] = [];
-    for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
-      chunks.push(items.slice(i, i + ITEMS_PER_PAGE));
-    }
+    const chunks = packItemsIntoPages(items);
 
     chunks.forEach((chunk, i) =>
       pages.push({

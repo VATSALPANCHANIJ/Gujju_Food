@@ -20,16 +20,41 @@
   position: relative;
   width: calc(var(--page-w) * 2);
   height: var(--page-h);
+  margin: 0 auto;
+  /* horizontal drag is ours; vertical scrolling still belongs to the page */
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.book:active { cursor: grabbing; }
+
+/* The stage slides sideways so a CLOSED book shows only its cover, centred.
+   Perspective lives here because it must be the direct parent of the leaves. */
+.stage {
+  position: absolute;
+  inset: 0;
   perspective: 2600px;
   perspective-origin: 50% 40%;
-  margin: 0 auto;
-  /* hardcover slab behind the paper */
+}
+
+/* hardcover slabs — one per half, so a closed book shows only one board */
+.slabLeft,
+.slabRight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  z-index: 0;
+  pointer-events: none;
   background: linear-gradient(145deg, #123b33, #0a2a24);
-  border-radius: 10px;
   box-shadow: 0 40px 80px -40px rgba(10, 30, 26, 0.75),
     0 10px 26px -14px rgba(10, 30, 26, 0.5);
-  padding: 10px;
 }
+
+.slabLeft { left: 0; border-radius: 10px 2px 2px 10px; }
+.slabRight { right: 0; border-radius: 2px 10px 10px 2px; }
 
 /* spine + page-block thickness */
 .spine {
@@ -50,6 +75,10 @@
     rgba(0, 0, 0, 0) 100%
   );
 }
+
+/* A closed book has no visible page edges on the empty side. */
+.closedFront .edgeLeft,
+.closedBack .edgeRight { opacity: 0; }
 
 .edgeLeft,
 .edgeRight {
@@ -92,6 +121,13 @@
   box-shadow: inset 6px 0 14px -10px rgba(0, 0, 0, 0.5);
 }
 
+/* Recto — the right-hand face, hinged at the spine on its left edge. */
+.front {
+  border-radius: 2px 8px 8px 2px;
+  box-shadow: inset 6px 0 14px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Verso — flipped to face the other way, so it lands on the left half. */
 .back {
   transform: rotateY(180deg);
   border-radius: 8px 2px 2px 8px;
@@ -165,13 +201,15 @@
   background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
 
+/* Pagination guarantees the items fit, so nothing is clipped or overlapped. */
 .pageItems {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 0.55rem;
-  overflow: hidden;
+  overflow: visible;
+  min-height: 0;
 }
 
 .pageNo {
@@ -334,11 +372,14 @@
 @media (max-width: 900px) {
   .wrap { --page-w: min(88vw, 420px); --page-h: 560px; }
 
+  /* Single-page mode: the cover is already a page of its own, so no slide. */
   .book.single { width: var(--page-w); }
   .book.single .leaf { left: 10px; width: calc(100% - 20px); }
+  .book.single .slabLeft,
   .book.single .spine,
   .book.single .edgeLeft,
   .book.single .edgeRight { display: none; }
+  .book.single .slabRight { width: 100%; border-radius: 10px; }
 
   .page { padding: 24px 22px 28px; }
   .progress { min-width: 130px; font-size: 0.66rem; letter-spacing: 0.14em; }
