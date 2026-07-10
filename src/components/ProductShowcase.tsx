@@ -11,6 +11,12 @@ if (typeof window !== "undefined") {
 // Prefixes public asset paths on GitHub Pages (e.g. /Gujju_Food). Empty in dev.
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
+// Section 02 backdrop artwork. The filename contains spaces, so it must be
+// encoded before it goes into a CSS url().
+const STAGE_BG = `${BASE_PATH}/assets/Menu-Section/${encodeURIComponent(
+  "Second Section BG Image.png"
+)}`;
+
 interface Product {
   id: string;
   name: string;
@@ -224,26 +230,16 @@ export default function ProductShowcase() {
         }
       });
 
-      // --- Continuous "alive" motion, independent of scroll. ---
+      // --- Continuous "alive" motion: the PRODUCT and its ingredient labels only.
+      // The backdrop (paper, gold wash, curve, heritage watermarks) never moves.
       if (!reduce) {
         slides.forEach((slide) => {
           const float = slide.querySelector<HTMLElement>(".ps-image-float");
-          const glow = slide.querySelector<HTMLElement>(".ps-glow");
           if (float) {
             gsap.to(float, { yPercent: -4, duration: 3.2, ease: "sine.inOut", repeat: -1, yoyo: true });
             gsap.to(float, {
               rotate: 1.4,
               duration: 5,
-              ease: "sine.inOut",
-              repeat: -1,
-              yoyo: true,
-            });
-          }
-          if (glow) {
-            gsap.to(glow, {
-              scale: 1.12,
-              opacity: 0.85,
-              duration: 4,
               ease: "sine.inOut",
               repeat: -1,
               yoyo: true,
@@ -259,22 +255,6 @@ export default function ProductShowcase() {
               yoyo: true,
             });
           });
-        });
-
-        // Organic wave drift, top and bottom.
-        gsap.to(".ps-wave.top .ps-wave-inner", {
-          xPercent: -22,
-          duration: 14,
-          ease: "sine.inOut",
-          repeat: -1,
-          yoyo: true,
-        });
-        gsap.to(".ps-wave.bottom .ps-wave-inner", {
-          xPercent: 22,
-          duration: 17,
-          ease: "sine.inOut",
-          repeat: -1,
-          yoyo: true,
         });
       }
 
@@ -303,29 +283,13 @@ export default function ProductShowcase() {
     return () => ctx.revert();
   }, []);
 
-  const wave = (
-    <div className="ps-wave-inner">
-      <svg viewBox="0 0 1440 140" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M0,64 C180,110 360,18 540,52 C720,86 900,118 1080,86 C1260,54 1350,40 1440,58 L1440,140 L0,140 Z"
-          fill="url(#ps-wave-grad)"
-        />
-        <defs>
-          <linearGradient id="ps-wave-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(43,167,160,0.10)" />
-            <stop offset="50%" stopColor="rgba(244,208,111,0.14)" />
-            <stop offset="100%" stopColor="rgba(255,136,17,0.10)" />
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
-  );
-
   return (
     <section ref={sectionRef} className="ps-section" id="signature-favourites">
-      <div ref={stageRef} className="ps-stage">
-        <div className="ps-wave top">{wave}</div>
-
+      <div
+        ref={stageRef}
+        className="ps-stage"
+        style={{ ["--ps-bg-image" as string]: `url("${STAGE_BG}")` }}
+      >
         <span className="ps-eyebrow">Signature Gujarati Favourites</span>
 
         {PRODUCTS.map((p, i) => {
@@ -363,6 +327,9 @@ export default function ProductShowcase() {
               </div>
 
               <div className="ps-center">
+                {/* soft radial spotlight · subtle teal glow · restrained accent */}
+                <div className="ps-spot" />
+                <div className="ps-teal-glow" />
                 <div className="ps-glow" />
                 <div className="ps-image-wrap">
                   <div className="ps-image-float">
@@ -384,6 +351,7 @@ export default function ProductShowcase() {
                     )}
                   </div>
                 </div>
+                <div className="ps-shadow" />
                 <div className="ps-floats">
                   {p.ingredients.map((ing, ci) => {
                     const pos = chipPosition(ci, p.ingredients.length);
@@ -419,8 +387,6 @@ export default function ProductShowcase() {
           );
         })}
 
-      
-        <div className="ps-wave bottom">{wave}</div>
       </div>
     </section>
   );

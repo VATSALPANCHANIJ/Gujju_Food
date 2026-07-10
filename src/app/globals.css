@@ -496,7 +496,9 @@ button {
    ========================================================================== */
 .ps-section {
   /* Section-local palette (kept consistent across products; only --glow changes) */
-  --ps-bg: #fff8f0; /* Floral White */
+  --ps-ivory: #fbf8f2; /* Soft Ivory */
+  --ps-cream: #f6efe3; /* Warm Cream */
+  --ps-bg: var(--ps-ivory);
   --ps-teal: #2ba7a0;
   --ps-gold: #f4d06f;
   --ps-orange: #ff8811;
@@ -505,15 +507,23 @@ button {
   position: relative;
   width: 100%;
   max-width: 100vw;
-  overflow-x: clip; /* floating chips / glow / waves never cause page scroll */
+  overflow-x: clip; /* floating chips / spotlight never cause page scroll */
 }
 
+/* The artwork supplies the ivory paper, warm cream gradients, the soft centre
+   glow, the elegant curved base and the Gujarat heritage watermarks in both
+   bottom corners. It is entirely static — nothing here animates. The URL is
+   injected inline (as --ps-bg-image) so it picks up NEXT_PUBLIC_BASE_PATH. */
 .ps-stage {
   position: relative;
   height: 100vh;
   width: 100%;
   overflow: hidden;
-  background: radial-gradient(125% 90% at 50% 42%, #fffdfa 0%, var(--ps-bg) 58%, #f5ebde 100%);
+  background-color: var(--ps-ivory);
+  background-image: var(--ps-bg-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--ps-text);
   font-family: var(--font-gotib), var(--font-sans);
 }
@@ -522,6 +532,7 @@ button {
 .ps-slide {
   position: absolute;
   inset: 0;
+  z-index: 1; /* always above the static backdrop */
   display: grid;
   grid-template-columns: minmax(200px, 1fr) minmax(340px, 1.3fr) minmax(200px, 1fr);
   align-items: center;
@@ -596,16 +607,57 @@ button {
   justify-content: center;
 }
 
+/* ---- Product spotlight: soft radial light + subtle teal + contact shadow ---- */
+
+/* Neutral warm spotlight that lifts the product off the ivory. Kept light —
+   the backdrop artwork already carries the centre glow. */
+.ps-spot {
+  position: absolute;
+  z-index: 0;
+  width: min(70vh, 620px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 62%);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* Subtle teal cast — brand warmth, not a spectacle. */
+.ps-teal-glow {
+  position: absolute;
+  z-index: 0;
+  width: min(52vh, 470px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(43, 167, 160, 0.13), rgba(43, 167, 160, 0) 66%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+/* Per-product accent tint, deliberately restrained (no excessive glow). */
 .ps-glow {
   position: absolute;
-  width: min(62vh, 540px);
+  width: min(56vh, 480px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 46%, var(--glow), rgba(0, 0, 0, 0) 68%);
-  filter: blur(10px);
+  filter: blur(26px);
+  opacity: 0.38;
   z-index: 1;
   pointer-events: none;
-  will-change: transform, opacity;
+}
+
+/* Very soft elliptical contact shadow beneath the product. */
+.ps-shadow {
+  position: absolute;
+  z-index: 2;
+  bottom: 8%;
+  width: min(34vh, 300px);
+  height: clamp(18px, 3vh, 34px);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(62, 46, 26, 0.20), rgba(62, 46, 26, 0) 70%);
+  filter: blur(7px);
+  pointer-events: none;
 }
 
 .ps-image-wrap {
@@ -730,41 +782,6 @@ button {
   will-change: transform, opacity;
 }
 
-/* ---- Organic SVG waves, top & bottom ---- */
-.ps-wave {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: clamp(80px, 14vh, 150px);
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-  line-height: 0;
-}
-
-.ps-wave.top {
-  top: -1px;
-}
-
-.ps-wave.bottom {
-  bottom: -1px;
-  transform: scaleY(-1);
-}
-
-.ps-wave-inner {
-  position: absolute;
-  inset: 0;
-  width: 130%;
-  left: -15%;
-  will-change: transform;
-}
-
-.ps-wave-inner svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 /* ---- Section chrome: eyebrow + product counter ---- */
 .ps-eyebrow {
   position: absolute;
@@ -773,8 +790,8 @@ button {
   transform: translateX(-50%);
   z-index: 6;
   font-family: var(--font-gotib), var(--font-sans);
-  font-size: 0.72rem;
-  letter-spacing: 0.4em;
+  font-size: clamp(0.9rem, 1.25vw, 1.2rem);
+  letter-spacing: 0.36em;
   text-transform: uppercase;
   color: var(--ps-teal);
   white-space: nowrap;
@@ -822,6 +839,15 @@ button {
   .ps-glow {
     width: min(40vh, 320px);
   }
+  .ps-spot {
+    width: min(50vh, 400px);
+  }
+  .ps-teal-glow {
+    width: min(38vh, 300px);
+  }
+  .ps-shadow {
+    width: min(24vh, 200px);
+  }
   .ps-image-wrap {
     width: min(34vh, 260px);
   }
@@ -832,8 +858,8 @@ button {
     justify-content: center;
   }
   .ps-eyebrow {
-    font-size: 0.64rem;
-    letter-spacing: 0.3em;
+    font-size: clamp(0.72rem, 2.6vw, 0.86rem);
+    letter-spacing: 0.28em;
   }
 }
 

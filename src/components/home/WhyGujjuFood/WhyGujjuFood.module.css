@@ -1,0 +1,216 @@
+/* ==========================================================================
+   WHY GUJJU FOOD HUB — premium 55/45 editorial split.
+   Background is the supplied artwork (cover / centre / no-repeat / not fixed);
+   nothing overlays or dims it. Only the image, copy, features and button animate.
+   Heading uses the site serif (Playfair); body uses the site sans.
+   ========================================================================== */
+
+.section {
+  --gold: #b0863f;
+  --green: #0e3b34; /* dark green */
+  --teal-accent: #2ba7a0;
+  --muted: #5b6560;
+
+  position: relative;
+  width: 100%;
+  color: #2d2d2d;
+
+  /* supplied background artwork — exact, no overlay/blur/opacity change */
+  background-color: #f6efe1;
+  background-image: var(--why-bg, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: scroll; /* NOT fixed */
+
+  padding: clamp(64px, 12vw, 160px) clamp(20px, 6vw, 80px);
+}
+
+.inner {
+  position: relative;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 55fr 45fr;
+  align-items: center;
+  gap: 80px;
+}
+
+/* ---- LEFT: food composition -------------------------------------------- */
+.visual {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* The image is a transparent cut-out, so it floats directly on the background
+   with a soft drop-shadow (which follows the food, not a rectangle). The box is
+   locked to the artwork's 1418×1109 ratio and the image is `contain`, so the
+   full composition always shows — no dish is ever cropped. */
+.frame {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  aspect-ratio: 1418 / 1109;
+  border-radius: 28px;
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.frame:hover {
+  transform: translateY(-6px); /* very subtle lift */
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 28px;
+  /* soft premium shadow, hugging the composition */
+  filter: drop-shadow(0 26px 34px rgba(54, 40, 18, 0.24));
+}
+
+/* ---- RIGHT: content ----------------------------------------------------- */
+.content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.label {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 1.2rem;
+}
+
+.heading {
+  font-family: var(--font-serif); /* Playfair Display */
+  font-size: clamp(2rem, 3.4vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: var(--green);
+  margin: 0 0 1.4rem;
+  max-width: 540px;
+}
+
+.lead {
+  font-family: var(--font-sans);
+  font-size: clamp(0.98rem, 1.15vw, 1.08rem);
+  line-height: 1.75;
+  color: var(--muted);
+  margin: 0 0 2.4rem;
+  max-width: 540px;
+}
+
+/* ---- feature grid: 2 columns, 6 items ---------------------------------- */
+.features {
+  list-style: none;
+  margin: 0 0 2.6rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 1.8rem;
+  width: 100%;
+  max-width: 560px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.featureIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--teal-accent);
+  background: #fbf6ec; /* soft cream */
+  border: 1px solid rgba(176, 134, 63, 0.3); /* thin border */
+}
+
+.featureText {
+  font-family: var(--font-sans);
+  font-size: 0.94rem;
+  line-height: 1.35;
+  color: #3f4a46;
+}
+
+/* ---- button (matches the site's primary pill) --------------------------- */
+.cta { margin-top: 0.2rem; }
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--green);
+  border: 1.5px solid var(--gold);
+  padding: 1rem 2.2rem;
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: 0 14px 30px -18px rgba(14, 59, 52, 0.6);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.button:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 18px 36px -14px rgba(176, 134, 63, 0.6),
+    0 0 0 4px rgba(176, 134, 63, 0.16); /* gold glow */
+}
+
+.buttonArrow { transition: transform 0.3s ease; }
+.button:hover .buttonArrow { transform: translateX(4px); }
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+/* Tablet — stack: image on top, content below, gap 60px. */
+@media (max-width: 1024px) {
+  .inner {
+    grid-template-columns: 1fr;
+    gap: 60px;
+    justify-items: center;
+  }
+  .visual { width: 100%; }
+  .content { align-items: center; text-align: center; }
+  .heading, .lead { margin-left: auto; margin-right: auto; }
+  .features { justify-items: start; margin-inline: auto; }
+}
+
+/* Mobile — single column, centred; image full width; features 1 col; button full. */
+@media (max-width: 600px) {
+  .inner { gap: 44px; }
+  .frame { max-width: 100%; border-radius: 22px; }
+  .image { border-radius: 22px; }
+  .features {
+    grid-template-columns: 1fr;
+    max-width: 22rem;
+  }
+  .feature { justify-content: flex-start; }
+  .cta { width: 100%; }
+  .button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame, .button, .buttonArrow { transition: none; }
+  .frame:hover, .button:hover { transform: none; }
+}
